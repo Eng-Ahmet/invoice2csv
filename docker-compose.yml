@@ -14,7 +14,7 @@ services:
       dockerfile: Dockerfile
     container_name: invoice2csv-backend
     ports:
-      - "3000:3000"
+      - "3840:3000"
     environment:
       - PORT=3000
       - MONGO_URI=mongodb://mongodb:27017/invoice2csv
@@ -28,7 +28,7 @@ services:
       dockerfile: Dockerfile
     container_name: invoice2csv-frontend
     ports:
-      - "4200:80"
+      - "4840:80"
     depends_on:
       - backend
     restart: unless-stopped

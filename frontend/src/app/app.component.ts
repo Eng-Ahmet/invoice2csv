@@ -45,7 +45,7 @@ export class AppComponent {
     });
 
     try {
-      const response = await fetch('http://localhost:3000/api/v1/invoices/extract', {
+      const response = await fetch('http://localhost:3840/api/v1/invoices/extract', {
         method: 'POST',
         body: formData
       });
@@ -64,7 +64,7 @@ export class AppComponent {
     if (this.invoices.length === 0) return;
 
     try {
-      const response = await fetch('http://localhost:3000/api/v1/invoices/export', {
+      const response = await fetch('http://localhost:3840/api/v1/invoices/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
