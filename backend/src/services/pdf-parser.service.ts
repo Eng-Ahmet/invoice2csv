@@ -7,10 +7,16 @@ export class PdfParserService {
    * STRICT RULE: Zero hardcoded fallback values. Only extracts real PDF text data.
    */
   public async extractInvoiceData(pdfBuffer: Buffer): Promise<IExtractedInvoice> {
+    // 1. Try Python Vision & Tesseract/CUDA Service if active
+    const pythonVisionExtracted = await this.extractWithPythonVision(pdfBuffer);
+    if (pythonVisionExtracted) {
+      return pythonVisionExtracted;
+    }
+
     const data = await pdfParse(pdfBuffer);
     const text = data.text;
 
-    // 1. Try local Ollama LLM extraction if running
+    // 2. Try local Ollama LLM extraction if available locally
     const ollamaExtracted = await this.extractWithOllama(text);
     if (ollamaExtracted) {
       return ollamaExtracted;
@@ -41,6 +47,32 @@ export class PdfParserService {
       total: financials.total,
       currency: financials.currency
     };
+  }
+
+  /**
+   * Forward PDF buffer to Python Computer Vision & OCR FastAPI service
+   */
+  private async extractWithPythonVision(pdfBuffer: Buffer): Promise<IExtractedInvoice | null> {
+    try {
+      const pythonServiceUrl = process.env.PYTHON_VISION_URL || 'http://localhost:5840/extract-vision';
+      const formData = new Blob([pdfBuffer], { type: 'application/pdf' });
+      const body = new FormData();
+      body.append('file', formData, 'invoice.pdf');
+
+      const res = await fetch(pythonServiceUrl, {
+        method: 'POST',
+        body: body
+      });
+
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && (data.invoiceNumber || data.total || data.sellerName)) {
+        return data as IExtractedInvoice;
+      }
+    } catch (e) {
+      // Python Vision Service offline - fallback gracefully
+    }
+    return null;
   }
 
   /**
