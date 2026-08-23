@@ -52,13 +52,13 @@ export class InvoiceController {
 
   public async handleExportCsv(req: Request, res: Response): Promise<void> {
     try {
-      const { invoices, format } = req.body;
+      const { invoices, format, itemized } = req.body;
       if (!invoices || !Array.isArray(invoices)) {
         res.status(400).json({ error: 'Invalid or missing "invoices" array payload' });
         return;
       }
 
-      const csvContent = csvExporter.exportToCsv(invoices, format || 'STANDARD');
+      const csvContent = csvExporter.exportToCsv(invoices, format || 'STANDARD', itemized !== false);
       
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=invoices_${format || 'standard'}.csv`);

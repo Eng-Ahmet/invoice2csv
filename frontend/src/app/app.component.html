@@ -4,18 +4,18 @@
       <span class="icon">🧾</span>
       <div>
         <h1>Invoice2CSV</h1>
-        <span class="subtitle">Extractor de Facturas Comerciales y Servicios a CSV Contable</span>
+        <span class="subtitle">Extractor de Facturas Comerciales, KYC de Clientes y Desglose por Artículos</span>
       </div>
     </div>
     <div class="preset-pill">
-      100% Extracción Real (Sin valores predeterminados)
+      100% Extracción Real & Engine PyTorch CUDA
     </div>
   </header>
 
   <main class="content">
     <div class="hero">
-      <h2>Extracción Inteligente de <span class="gradient-text">Vendedor, Comprador y Líneas</span></h2>
-      <p>Procesa facturas comerciales o de servicios en cualquier idioma o formato. Identifica al Vendedor, Comprador, Fechas, Conceptos y Desglose Tributario.</p>
+      <h2>Extracción Inteligente de <span class="gradient-text">Identidad KYC, Vendedor, Comprador y Artículos</span></h2>
+      <p>Procesa facturas en cualquier idioma. Identifica al Vendedor (Proveedor), Comprador (Cliente KYC), Fechas, Desglose de Múltiples Artículos y Totales Tributarios.</p>
     </div>
 
     <!-- Drop Zone -->
@@ -24,7 +24,7 @@
       <div class="drop-content" (click)="fileInput.click()">
         <span class="upload-icon">📄</span>
         <h3>Selecciona o arrastra tus facturas PDF</h3>
-        <p>Soporta facturas comerciales, de servicios y procesamiento en lote (Batch Upload)</p>
+        <p>Soporta procesamiento en lote y desglose por artículos/servicios para Holded, Anfix y Excel</p>
       </div>
 
       <div *ngIf="selectedFiles.length > 0" class="file-list">
@@ -38,15 +38,29 @@
     <!-- Interactive Data Verification Table -->
     <div *ngIf="invoices.length > 0" class="results-card">
       <div class="results-header">
-        <h3>Verificación de Facturas Extrayendo ({{ invoices.length }})</h3>
+        <div>
+          <h3>Verificación de Facturas Extrayendo ({{ invoices.length }})</h3>
+          <span class="help-hint">Haz clic en 📦 <b>desglose de conceptos</b> para ver los artículos comprados o editar la Identidad KYC del Cliente.</span>
+        </div>
         
         <div class="export-controls">
-          <label>Formato Contable:</label>
-          <select [(ngModel)]="exportFormat" class="select-input">
-            <option value="HOLDED">Holded CSV</option>
-            <option value="ANFIX">Anfix CSV</option>
-            <option value="STANDARD">Standard CSV</option>
-          </select>
+          <div class="control-group">
+            <label>Formato Contable:</label>
+            <select [(ngModel)]="exportFormat" class="select-input">
+              <option value="HOLDED">Holded CSV</option>
+              <option value="ANFIX">Anfix CSV</option>
+              <option value="STANDARD">Standard CSV</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label>Modo de Exportación:</label>
+            <select [(ngModel)]="itemizedExport" class="select-input highlight-select">
+              <option [ngValue]="true">Desglosado por Artículo (1 fila x ítem)</option>
+              <option [ngValue]="false">Resumen por Factura (1 fila x factura)</option>
+            </select>
+          </div>
+
           <button class="btn-success" (click)="downloadCsv()">📥 Descargar CSV Contable</button>
         </div>
       </div>
@@ -59,17 +73,18 @@
               <th>Fecha</th>
               <th>Vendedor (Proveedor)</th>
               <th>NIF Vendedor</th>
-              <th>Comprador (Cliente)</th>
+              <th>Comprador (Cliente KYC)</th>
               <th>NIF Comprador</th>
-              <th>Conceptos / Líneas</th>
+              <th>Conceptos / Artículos</th>
               <th>Subtotal</th>
               <th>% IVA</th>
               <th>Total IVA</th>
               <th>Total Factura</th>
             </tr>
           </thead>
-          <tbody>
-            <tr *ngFor="let inv of invoices">
+          <tbody *ngFor="let inv of invoices; let i = index">
+            <!-- Main Summary Row -->
+            <tr class="main-row" [class.active-expanded]="inv.expanded">
               <td><input [(ngModel)]="inv.invoiceNumber" class="table-input"></td>
               <td><input [(ngModel)]="inv.invoiceDate" class="table-input"></td>
               <td><input [(ngModel)]="inv.sellerName" class="table-input highlight"></td>
@@ -77,17 +92,102 @@
               <td><input [(ngModel)]="inv.buyerName" class="table-input highlight-buyer"></td>
               <td><input [(ngModel)]="inv.buyerNif" class="table-input"></td>
               <td>
-                <span *ngIf="inv.items && inv.items.length > 0" class="items-badge">
-                  {{ inv.items.length }} concepto(s)
-                </span>
-                <span *ngIf="!inv.items || inv.items.length === 0" class="no-items">
-                  Sin detalle
-                </span>
+                <button class="btn-badge" (click)="toggleExpand(inv)" [class.has-items]="inv.items && inv.items.length > 0">
+                  📦 {{ inv.items ? inv.items.length : 0 }} concepto(s) {{ inv.expanded ? '▲' : '▼' }}
+                </button>
               </td>
               <td><input type="number" [(ngModel)]="inv.subtotal" class="table-input"></td>
               <td><input type="number" [(ngModel)]="inv.taxRate" class="table-input"></td>
               <td><input type="number" [(ngModel)]="inv.taxAmount" class="table-input"></td>
               <td><input type="number" [(ngModel)]="inv.total" class="table-input bold"></td>
+            </tr>
+
+            <!-- Expanded KYC & Line Items Detail Sub-Row -->
+            <tr *ngIf="inv.expanded" class="expandable-row">
+              <td colspan="11">
+                <div class="expanded-panel">
+                  <!-- Section 1: Client & Seller Identity KYC Data -->
+                  <div class="kyc-section">
+                    <h4>🔍 Identidad Legal y KYC de las Partes</h4>
+                    <div class="kyc-grid">
+                      <div class="kyc-box seller-box">
+                        <span class="box-title">🏢 Identidad Vendedor / Emisor</span>
+                        <div class="field-row">
+                          <label>Nombre / Razón Social:</label>
+                          <input [(ngModel)]="inv.sellerName" class="sub-input">
+                        </div>
+                        <div class="field-row">
+                          <label>NIF / CIF / VAT ID:</label>
+                          <input [(ngModel)]="inv.sellerNif" class="sub-input">
+                        </div>
+                        <div class="field-row">
+                          <label>Dirección Fiscal:</label>
+                          <input [(ngModel)]="inv.sellerAddress" placeholder="Calle / Avda, Ciudad" class="sub-input">
+                        </div>
+                      </div>
+
+                      <div class="kyc-box buyer-box">
+                        <span class="box-title">👤 Identidad Comprador / Cliente (KYC)</span>
+                        <div class="field-row">
+                          <label>Nombre Cliente / Razón Social:</label>
+                          <input [(ngModel)]="inv.buyerName" class="sub-input">
+                        </div>
+                        <div class="field-row">
+                          <label>NIF / CIF Cliente:</label>
+                          <input [(ngModel)]="inv.buyerNif" class="sub-input">
+                        </div>
+                        <div class="field-row">
+                          <label>Dirección Cliente:</label>
+                          <input [(ngModel)]="inv.buyerAddress" placeholder="Dirección completa del comprador" class="sub-input">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Section 2: Multiple Line Items Breakdown Table -->
+                  <div class="items-section">
+                    <div class="items-header">
+                      <h4>🛒 Desglose de Artículos / Piezas Compradas ({{ inv.items ? inv.items.length : 0 }})</h4>
+                      <button class="btn-add-item" (click)="addItem(inv)">+ Añadir Artículo / Pieza</button>
+                    </div>
+
+                    <table class="sub-table" *ngIf="inv.items && inv.items.length > 0">
+                      <thead>
+                        <tr>
+                          <th style="width: 50px;">#</th>
+                          <th>Descripción del Artículo / Elemento / Servicio</th>
+                          <th style="width: 100px;">Cantidad</th>
+                          <th style="width: 130px;">Precio Unitario (€)</th>
+                          <th style="width: 130px;">Importe Línea (€)</th>
+                          <th style="width: 60px;">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let item of inv.items; let itemIdx = index">
+                          <td class="center-text"><b>{{ item.itemNumber }}</b></td>
+                          <td><input [(ngModel)]="item.description" class="sub-input"></td>
+                          <td>
+                            <input type="number" [(ngModel)]="item.quantity" (ngModelChange)="recalculateItemAmount(inv)" class="sub-input center-text">
+                          </td>
+                          <td>
+                            <input type="number" [(ngModel)]="item.unitPrice" (ngModelChange)="recalculateItemAmount(inv)" class="sub-input">
+                          </td>
+                          <td>
+                            <input type="number" [(ngModel)]="item.amount" class="sub-input bold">
+                          </td>
+                          <td class="center-text">
+                            <button class="btn-delete" (click)="removeItem(inv, itemIdx)" title="Eliminar artículo">🗑️</button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <div *ngIf="!inv.items || inv.items.length === 0" class="empty-items-notice">
+                      No hay artículos desglosados en esta factura. Puedes añadir artículos pulsando "+ Añadir Artículo / Pieza".
+                    </div>
+                  </div>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>

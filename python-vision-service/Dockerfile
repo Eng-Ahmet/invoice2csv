@@ -4,6 +4,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-spa \
+    tesseract-ocr-eng \
     poppler-utils \
     ffmpeg \
     libsm6 \
@@ -20,6 +21,5 @@ COPY main.py ./
 EXPOSE 5000
 
 ENV PORT=5000
-ENV OLLAMA_HOST=http://host.docker.internal:11434
 
 CMD ["python", "main.py"]

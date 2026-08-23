@@ -4,6 +4,7 @@
   --border: #334155;
   --primary: #3b82f6;
   --success: #10b981;
+  --warning: #f59e0b;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
 }
@@ -17,7 +18,7 @@ body {
 }
 
 .app-layout {
-  max-width: 1300px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -107,14 +108,34 @@ button {
 .results-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.help-hint {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
 }
 
 .export-controls {
   display: flex;
   gap: 1rem;
-  align-items: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.control-group label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .select-input {
@@ -123,6 +144,12 @@ button {
   border: 1px solid var(--border);
   padding: 0.5rem;
   border-radius: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.select-input.highlight-select {
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .table-wrapper { overflow-x: auto; }
@@ -141,6 +168,10 @@ button {
 
 .grid-table th { color: var(--text-muted); }
 
+.main-row.active-expanded {
+  background: rgba(59, 130, 246, 0.08);
+}
+
 .table-input {
   background: var(--bg-dark);
   color: white;
@@ -156,15 +187,159 @@ button {
 .table-input.highlight-buyer { border-color: #f59e0b; }
 .table-input.bold { font-weight: bold; color: var(--success); }
 
-.items-badge {
+.btn-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--primary);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-badge.has-items {
   background: rgba(16, 185, 129, 0.15);
   color: var(--success);
-  padding: 0.2rem 0.5rem;
-  border-radius: 0.25rem;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.btn-badge:hover {
+  filter: brightness(1.2);
+}
+
+/* Expandable Drawer Panel */
+.expandable-row td {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 1.25rem;
+}
+
+.expanded-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: #0f172a;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.kyc-section h4, .items-section h4 {
+  margin: 0 0 0.8rem 0;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kyc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.kyc-box {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.seller-box { border-left: 3px solid var(--primary); }
+.buyer-box { border-left: 3px solid var(--warning); }
+
+.box-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.field-row label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.sub-input {
+  background: var(--bg-dark);
+  color: white;
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.35rem;
+  font-size: 0.82rem;
+  width: 95%;
+}
+
+.sub-input.bold {
+  font-weight: bold;
+  color: var(--success);
+}
+
+.sub-input.center-text, .center-text {
+  text-align: center;
+}
+
+.items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.btn-add-item {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+  border-radius: 0.4rem;
+}
+
+.sub-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  background: rgba(30, 41, 59, 0.4);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.sub-table th, .sub-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.sub-table th {
+  background: rgba(30, 41, 59, 0.9);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.btn-delete {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.3rem;
   font-size: 0.75rem;
 }
 
-.no-items {
+.empty-items-notice {
+  padding: 1rem;
+  text-align: center;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
+  background: rgba(30, 41, 59, 0.3);
+  border-radius: 0.5rem;
+  border: 1px dashed var(--border);
 }

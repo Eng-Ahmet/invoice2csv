@@ -7,22 +7,10 @@ export class PdfParserService {
    * STRICT RULE: Zero hardcoded fallback values. Only extracts real PDF text data.
    */
   public async extractInvoiceData(pdfBuffer: Buffer): Promise<IExtractedInvoice> {
-    // 1. Try Python Vision & Tesseract/CUDA Service if active
-    const pythonVisionExtracted = await this.extractWithPythonVision(pdfBuffer);
-    if (pythonVisionExtracted) {
-      return pythonVisionExtracted;
-    }
-
     const data = await pdfParse(pdfBuffer);
     const text = data.text;
 
-    // 2. Try local Ollama LLM extraction if available locally
-    const ollamaExtracted = await this.extractWithOllama(text);
-    if (ollamaExtracted) {
-      return ollamaExtracted;
-    }
-
-    // 2. Comprehensive Contextual Rule Engine
+    // 1. Comprehensive Contextual Rule Engine Extraction
     const invoiceNumber = this.extractInvoiceNumber(text);
     const invoiceDate = this.extractDate(text);
     const { sellerName, sellerNif, sellerAddress } = this.extractSellerInfo(text);
@@ -30,7 +18,7 @@ export class PdfParserService {
     const items = this.extractLineItems(text);
     const financials = this.extractFinancials(text);
 
-    return {
+    const nativeExtracted: IExtractedInvoice = {
       invoiceNumber: invoiceNumber,
       invoiceDate: invoiceDate,
       sellerName: sellerName,
@@ -47,6 +35,19 @@ export class PdfParserService {
       total: financials.total,
       currency: financials.currency
     };
+
+    // If native text parsing got clear seller and buyer names, return immediately
+    if (nativeExtracted.sellerName && nativeExtracted.buyerName && nativeExtracted.sellerName !== nativeExtracted.buyerName) {
+      return nativeExtracted;
+    }
+
+    // 2. Try Python PyTorch & Vision Service as fallback if needed
+    const pythonVisionExtracted = await this.extractWithPythonVision(pdfBuffer);
+    if (pythonVisionExtracted && pythonVisionExtracted.sellerName && pythonVisionExtracted.buyerName && pythonVisionExtracted.sellerName !== pythonVisionExtracted.buyerName) {
+      return pythonVisionExtracted;
+    }
+
+    return nativeExtracted;
   }
 
   /**
@@ -55,7 +56,7 @@ export class PdfParserService {
   private async extractWithPythonVision(pdfBuffer: Buffer): Promise<IExtractedInvoice | null> {
     try {
       const pythonServiceUrl = process.env.PYTHON_VISION_URL || 'http://localhost:5840/extract-vision';
-      const formData = new Blob([pdfBuffer], { type: 'application/pdf' });
+      const formData = new Blob([pdfBuffer as unknown as BlobPart], { type: 'application/pdf' });
       const body = new FormData();
       body.append('file', formData, 'invoice.pdf');
 
@@ -71,84 +72,6 @@ export class PdfParserService {
       }
     } catch (e) {
       // Python Vision Service offline - fallback gracefully
-    }
-    return null;
-  }
-
-  /**
-   * Zero-fallback Ollama local LLM vision/text prompt
-   */
-  private async extractWithOllama(text: string): Promise<IExtractedInvoice | null> {
-    try {
-      const prompt = `You are a professional invoice data extraction system. Parse this invoice text and return JSON matching this EXACT structure.
-Do NOT invent fake data. Return empty string "" or 0 if a field is not present in the document.
-
-JSON Schema:
-{
-  "invoiceNumber": "string",
-  "invoiceDate": "YYYY-MM-DD",
-  "sellerName": "string",
-  "sellerNif": "string",
-  "sellerAddress": "string",
-  "buyerName": "string",
-  "buyerNif": "string",
-  "buyerAddress": "string",
-  "items": [
-    {
-      "itemNumber": 1,
-      "description": "string",
-      "quantity": 1,
-      "unitPrice": 0,
-      "amount": 0
-    }
-  ],
-  "subtotal": 0,
-  "taxRate": 0,
-  "taxAmount": 0,
-  "irpfAmount": 0,
-  "total": 0,
-  "currency": "EUR/USD"
-}
-
-Invoice Raw Text:
-${text.substring(0, 4000)}`;
-
-      const res = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama3',
-          prompt: prompt,
-          stream: false,
-          format: 'json'
-        })
-      });
-
-      if (!res.ok) return null;
-      const resJson = await res.json();
-      const parsed = JSON.parse(resJson.response);
-
-      if (parsed && (parsed.invoiceNumber || parsed.total || parsed.sellerName)) {
-        return {
-          invoiceNumber: parsed.invoiceNumber || '',
-          invoiceDate: parsed.invoiceDate || '',
-          sellerName: parsed.sellerName || '',
-          sellerNif: parsed.sellerNif || '',
-          sellerAddress: parsed.sellerAddress || '',
-          buyerName: parsed.buyerName || '',
-          buyerNif: parsed.buyerNif || '',
-          buyerAddress: parsed.buyerAddress || '',
-          items: Array.isArray(parsed.items) ? parsed.items : [],
-          subtotal: Number(parsed.subtotal) || 0,
-          taxRate: Number(parsed.taxRate) || 0,
-          taxAmount: Number(parsed.taxAmount) || 0,
-          irpfAmount: Number(parsed.irpfAmount) || 0,
-          total: Number(parsed.total) || 0,
-          currency: parsed.currency || ''
-        };
-      }
-    } catch (e) {
-      // Ollama not responding or model not loaded
     }
     return null;
   }
@@ -182,80 +105,215 @@ ${text.substring(0, 4000)}`;
     return '';
   }
 
-  private extractSellerInfo(text: string): { sellerName: string; sellerNif: string; sellerAddress: string } {
+  private extractNif(blockText: string): string {
+    const patterns = [
+      /(?:NIF\s*\/\s*CIF|NIF|CIF|NIE|VAT|Tax\s*ID|DNI|C\.I\.F\.|N\.I\.F\.)\s*:?\s*([A-Z0-9\-\.]{8,12})/i,
+      /\b([ABCDEFGHJNPQRSUVW]\s*-?\s*\d{7,8}\s*[0-9A-J])\b/i,
+      /\b(\d{8}\s*-?\s*[A-Z])\b/i,
+      /\b([XYZ]\s*-?\s*\d{7}\s*[A-Z])\b/i,
+      /\b(ES\s*-?\s*[A-Z0-9]{8,10})\b/i
+    ];
+    for (const p of patterns) {
+      const match = blockText.match(p);
+      if (match) {
+        const clean = match[1].replace(/[\s\.-]/g, '').toUpperCase();
+        if (clean.length >= 8) return clean;
+      }
+    }
+    return '';
+  }
+
+  private isHeaderOrLabelLine(line: string): boolean {
+    const clean = line.trim();
+    if (!clean) return true;
+
+    // Document titles & headers
+    if (/^(?:Official\s*invoice\s*document|Official\s*invoice|Tax\s*Invoice|Commercial\s*Invoice|Invoice\s*Document|Factura\s*Proforma|Factura|Receipt|Recibo)$/i.test(clean)) return true;
+
+    // Metadata / Date / Invoice No / Verification / Registry lines
+    if (/^(?:Invoice\s*No|Issue\s*Date|Generated|Tax\s*Number|Verification\s*Code|Ref|Fecha|CR:)\b/i.test(clean)) return true;
+    if (/^[A-Z0-9]{10,}(?:-[A-Z0-9]+)+$/i.test(clean)) return true;
+
+    // Party block headers & combined headers (e.g. 'BILL TO / CLIENT IDENTITY KYC')
+    const headerWords = [
+      'SUPPLIER', 'VENDEDOR', 'EMISOR', 'PROVEEDOR', 'DE:', 'FROM:',
+      'FACTURADO A', 'DATOS DEL CLIENTE', 'DATOS DEL VENDEDOR', 'DATOS DEL EMISOR',
+      'CLIENT IDENTITY KYC', 'CLIENT IDENTITY', 'IDENTITY KYC', 'COMPRADOR',
+      'CLIENTE', 'BILL TO', 'INVOICE TO', 'SHIP TO', 'ENVIADO A', 'RECEPTOR',
+      'CLIENT', 'COMPANY / AUTÓNOMO', 'AUTÓNOMO', 'COMPANY', 'CUSTOMER', 'NAME', 'NOMBRE'
+    ];
+
+    const normalized = clean.replace(/[\/\:\-\s]+/g, ' ').trim().toUpperCase();
+    let temp = normalized;
+    for (const hw of headerWords) {
+      temp = temp.replace(hw, '').trim();
+    }
+    if (temp.length === 0) return true;
+
+    return false;
+  }
+
+  private isBlacklistedLine(line: string): boolean {
+    if (this.isHeaderOrLabelLine(line)) return true;
+    const blacklists = [
+      /about:srcdoc/i, /about:blank/i, /http/i, /https/i, /www\./i,
+      /HW\s*AI/i
+    ];
+    return blacklists.some(b => b.test(line));
+  }
+
+  private splitSideBySideNames(line: string): { seller: string; buyer: string } | null {
+    const clean = line.trim();
+    if (!clean) return null;
+
+    const multiSpaceParts = clean.split(/\s{2,}|\t/).map(p => p.trim()).filter(p => p.length > 0);
+    if (multiSpaceParts.length >= 2) {
+      if (multiSpaceParts[0].length > 2 && multiSpaceParts[1].length > 2) {
+        return { seller: multiSpaceParts[0], buyer: multiSpaceParts[multiSpaceParts.length - 1] };
+      }
+    }
+
+    const regexTwoNames = /^([A-Z\s]{4,30})\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,40})$/;
+    const match = clean.match(regexTwoNames);
+    if (match && match[1].trim().includes(' ') && match[2].trim().includes(' ')) {
+      return { seller: match[1].trim(), buyer: match[2].trim() };
+    }
+
+    return null;
+  }
+
+  private parseSinglePartyBlock(blockText: string, isBuyer: boolean = false): { name: string; nif: string; address: string } {
     let name = '';
-    let nif = '';
     let address = '';
 
-    // Match Supplier / Seller block
-    const supplierBlock = text.match(/(?:SUPPLIER|PROVEEDOR|VENDEDOR|EMISOR)([\s\S]*?)(?:BILL\s*TO|CLIENT|CLIENTE|COMPRADOR|#|\n\n\n)/i);
-    const blockText = supplierBlock ? supplierBlock[1] : text;
-
-    // Extract Tax ID / NIF / CIF
-    const nifMatch = blockText.match(/(?:ID\s*\/\s*Tax\s*No|Tax\s*Number|NIF|CIF|NIE|VAT\s*ID)\s*:?\s*([A-Z0-9]{8,11})/i);
-    if (nifMatch) {
-      nif = nifMatch[1].toUpperCase();
-    }
-
-    // Extract Name
+    const nif = this.extractNif(blockText);
     const lines = blockText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length > 0) {
-      name = lines[0].replace(/^(SUPPLIER|PROVEEDOR|VENDEDOR|EMISOR)\s*:?/i, '').trim();
+    const validLines: string[] = [];
+
+    for (const line of lines) {
+      const cleanL = line.replace(/^[\/\:\-\s]+/, '').trim();
+      if (!this.isBlacklistedLine(cleanL) && cleanL.length > 0) {
+        validLines.push(cleanL);
+      }
     }
 
-    // Extract Address if present
-    const addrMatch = blockText.match(/(?:Calle|C\/|Avda|Avenue|Carretera|Street|Address)\s*[^,\n]+,[^\n]+/i);
-    if (addrMatch) {
-      address = addrMatch[0].trim();
+    for (let i = 0; i < validLines.length; i++) {
+      const line = validLines[i];
+      let cleaned = line.replace(/^(EMISOR|PROVEEDOR|VENDEDOR|SUPPLIER|DE:|FROM:|FACTURADO\s*A|DATOS\s*DEL\s*CLIENTE|CLIENTE|COMPRADOR|BILL\s*TO|Nombre|Name)\s*:?\s*/i, '').trim();
+      cleaned = cleaned.replace(/^[\/\:\-\s]+/, '').trim();
+
+      const lineNif = this.extractNif(cleaned);
+      if (lineNif && lineNif === nif && cleaned.length < 20) continue;
+
+      if (this.isAddressLine(cleaned)) {
+        if (!address) {
+          address = cleaned;
+          if (i + 1 < validLines.length) {
+            const nextL = validLines[i + 1];
+            if (/^(?:Spain|España|Cádiz|Cadiz|Malaga|Málaga|Madrid|Barcelona|UK|USA|France|Germany|[A-Z][a-z]+|\([A-Za-záéíóúÁÉÍÓÚñÑ\s]+\))$/i.test(nextL) && !this.isAddressLine(nextL) && !this.extractNif(nextL)) {
+              address += `, ${nextL}`;
+            }
+          }
+        }
+        continue;
+      }
+
+      if (cleaned.length > 2 && !name && !/^(NIF|CIF|NIE|VAT|ID|Tel|Email|Tax|Factura|Fecha|Invoice|CR:)/i.test(cleaned)) {
+        const sideBySide = this.splitSideBySideNames(cleaned);
+        if (sideBySide) {
+          name = isBuyer ? sideBySide.buyer : sideBySide.seller;
+        } else {
+          name = cleaned;
+        }
+      }
     }
 
-    return { sellerName: name, sellerNif: nif, sellerAddress: address };
+    if (!address) {
+      for (const line of validLines) {
+        if (line !== name && !this.extractNif(line) && this.isAddressLine(line)) {
+          address = line;
+          break;
+        }
+      }
+    }
+
+    return { name, nif, address: address.replace(/,\s*,/g, ',').trim() };
+  }
+
+  private splitSideBySidePartyBlocks(text: string): { sellerText: string; buyerText: string } {
+    const lines = text.split('\n');
+    const sellerLines: string[] = [];
+    const buyerLines: string[] = [];
+
+    let inSideBySideSection = false;
+
+    for (const line of lines) {
+      const parts = line.split(/\s{2,}|\t/).map(p => p.trim()).filter(p => p.length > 0);
+      if (parts.length >= 2) {
+        const leftIsSeller = /(?:SUPPLIER|EMISOR|VENDEDOR|PROVEEDOR|DE:|FROM:)/i.test(parts[0]);
+        const rightIsBuyer = /(?:FACTURADO\s*A|DATOS\s*DEL\s*CLIENTE|CLIENT\s*IDENTITY|CLIENTE|COMPRADOR|BILL\s*TO|INVOICE\s*TO|CLIENT|RECEPTOR)/i.test(parts[1]);
+
+        if (leftIsSeller || rightIsBuyer || inSideBySideSection) {
+          inSideBySideSection = true;
+          sellerLines.push(parts[0]);
+          buyerLines.push(parts[1] || parts[parts.length - 1]);
+          continue;
+        }
+      } else {
+        if (inSideBySideSection && (line.trim().length === 0 || /^(?:#|Project|Item|Description|Subtotal|Total|Payment|Terms)/i.test(line.trim()))) {
+          inSideBySideSection = false;
+        }
+      }
+
+      if (!inSideBySideSection) {
+        sellerLines.push(line);
+      }
+    }
+
+    if (buyerLines.length === 0) {
+      const buyerMarker = text.match(/(?:FACTURADO\s*A|DATOS\s*DEL\s*CLIENTE|CLIENT\s*IDENTITY\s*KYC|CLIENT\s*IDENTITY|CLIENTE|COMPRADOR|BILL\s*TO|INVOICE\s*TO|CLIENT|RECEPTOR)/i);
+      const sellerText = buyerMarker && buyerMarker.index !== undefined ? text.substring(0, buyerMarker.index) : text.split('\n').slice(0, 7).join('\n');
+      const buyerText = buyerMarker && buyerMarker.index !== undefined ? text.substring(buyerMarker.index) : text.split('\n').slice(7).join('\n');
+      return { sellerText, buyerText };
+    }
+
+    return {
+      sellerText: sellerLines.join('\n'),
+      buyerText: buyerLines.join('\n')
+    };
+  }
+
+  private extractSellerInfo(text: string): { sellerName: string; sellerNif: string; sellerAddress: string } {
+    const { sellerText } = this.splitSideBySidePartyBlocks(text);
+    const parsed = this.parseSinglePartyBlock(sellerText, false);
+    return { sellerName: parsed.name, sellerNif: parsed.nif, sellerAddress: parsed.address };
+  }
+
+  private isAddressLine(line: string): boolean {
+    return /(?:Calle|C\/|C\.|Avda|Av\.|Avenue|Carretera|Ctra|Street|St\.|Address|Plaza|Pl\.|Pº|Paseo|Road|Rd\.|Via|Rua|Piso|Puerta|Bloque|Esc\.|Escalera|Conil|Málaga|Malaga|Madrid|Barcelona|Sevilla|Valencia|\b\d{5}\b)/i.test(line);
   }
 
   private extractBuyerInfo(text: string): { buyerName: string; buyerNif: string; buyerAddress: string } {
-    let name = '';
-    let nif = '';
-    let address = '';
+    const { buyerText } = this.splitSideBySidePartyBlocks(text);
+    const parsed = this.parseSinglePartyBlock(buyerText, true);
 
-    // Match Buyer / Client block
-    const buyerBlock = text.match(/(?:BILL\s*TO|CLIENT|CLIENTE|COMPRADOR|RECEPTOR)([\s\S]*?)(?:#|Project|Description|Subtotal|\n\n\n)/i);
-    if (buyerBlock) {
-      const blockText = buyerBlock[1];
-      const lines = blockText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      
-      if (lines.length > 0) {
-        name = lines[0].replace(/^(BILL\s*TO|CLIENT|CLIENTE|COMPRADOR)\s*:?/i, '').trim();
-      }
-
-      const nifMatch = blockText.match(/(?:ID\s*\/\s*Tax\s*No|ID|Tax\s*No|NIF|CIF|NIE|DNI)\s*:?\s*([A-Z0-9]{8,11})/i);
-      if (nifMatch) {
-        nif = nifMatch[1].toUpperCase();
-      }
-
-      const addrMatch = blockText.match(/(?:Calle|C\/|Avda|Avenue|Carretera|Street|Road)\s*[^,\n]+,[^\n]+/i);
-      if (addrMatch) {
-        address = addrMatch[0].trim();
-      }
-    }
-
-    return { buyerName: name, buyerNif: nif, buyerAddress: address };
+    return { buyerName: parsed.name, buyerNif: parsed.nif, buyerAddress: parsed.address };
   }
 
   private extractLineItems(text: string): IInvoiceItem[] {
     const items: IInvoiceItem[] = [];
     
-    // Look for tabular line items
-    // Example: 1  MOODIF  secunda pago  0% Milestone  €1,650.00  2026-08-18  Paid
-    const lineRegex = /^\s*(\d+)\s+([A-Za-z0-9_\-\s]{2,20})\s+([A-Za-z0-9_\-\s]{2,40})\s+.*?[€$]?\s*([0-9.,]+)/gm;
+    // Look for tabular line items (spaced or unspaced from PDF extraction)
+    const lineRegex = /(?:^|\n)\s*(\d+)\s*([A-Za-z0-9_\-\s%]{2,60}?)\s*[€$£]?\s*([0-9]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2}))/gm;
     let match;
     let index = 1;
 
     while ((match = lineRegex.exec(text)) !== null) {
-      const amt = this.parseMoney(match[4]);
+      const amt = this.parseMoney(match[3]);
       if (amt > 0) {
         items.push({
           itemNumber: index++,
-          description: `${match[2].trim()} - ${match[3].trim()}`,
+          description: match[2].trim(),
           quantity: 1,
           unitPrice: amt,
           amount: amt
@@ -283,8 +341,8 @@ ${text.substring(0, 4000)}`;
     const subMatch = text.match(/(?:Subtotal|Base\s*Imponible)\s*[€$£]?\s*([0-9.,]+)/i);
     if (subMatch) subtotal = this.parseMoney(subMatch[1]);
 
-    // Total / Total Due
-    const totalMatch = text.match(/(?:Total\s*Due|Total\s*Factura|Total|Importe\s*Total)\s*[€$£]?\s*([0-9.,]+)/i);
+    // Total / Total Due (Word boundary to prevent matching 'Subtotal')
+    const totalMatch = text.match(/\b(?:Total\s*Due|Total\s*Factura|Total|Importe\s*Total)\s*[€$£]?\s*([0-9.,]+)/i);
     if (totalMatch) total = this.parseMoney(totalMatch[1]);
 
     // VAT / IVA / Tax

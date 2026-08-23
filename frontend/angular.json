@@ -18,7 +18,11 @@
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.json",
-            "assets": [],
+            "assets": [
+              "src/favicon.ico",
+              "src/favicon.svg",
+              "src/assets"
+            ],
             "styles": ["src/app/app.component.css"],
             "scripts": []
           },

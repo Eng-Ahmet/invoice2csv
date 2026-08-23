@@ -26,6 +26,7 @@ export interface ExtractedInvoice {
   irpfAmount: number;
   total: number;
   currency: string;
+  expanded?: boolean;
 }
 
 @Component({
@@ -40,6 +41,7 @@ export class AppComponent {
   selectedFiles: File[] = [];
   invoices: ExtractedInvoice[] = [];
   exportFormat: 'STANDARD' | 'HOLDED' | 'ANFIX' = 'HOLDED';
+  itemizedExport: boolean = true;
   isProcessing = false;
 
   onFileSelected(event: any) {
@@ -64,12 +66,49 @@ export class AppComponent {
       });
       const data = await response.json();
       if (data.invoices) {
-        this.invoices = data.invoices;
+        this.invoices = data.invoices.map((inv: ExtractedInvoice) => ({
+          ...inv,
+          expanded: false
+        }));
       }
     } catch (err) {
       alert('Error de conexión con el backend de Invoice2CSV (Puerto 3840)');
     } finally {
       this.isProcessing = false;
+    }
+  }
+
+  toggleExpand(inv: ExtractedInvoice) {
+    inv.expanded = !inv.expanded;
+  }
+
+  addItem(inv: ExtractedInvoice) {
+    if (!inv.items) inv.items = [];
+    const nextNum = inv.items.length + 1;
+    inv.items.push({
+      itemNumber: nextNum,
+      description: 'Nuevo artículo / servicio',
+      quantity: 1,
+      unitPrice: 0,
+      amount: 0
+    });
+    this.recalculateItemAmount(inv);
+  }
+
+  removeItem(inv: ExtractedInvoice, index: number) {
+    if (inv.items && inv.items.length > index) {
+      inv.items.splice(index, 1);
+      // Re-index item numbers
+      inv.items.forEach((item, idx) => item.itemNumber = idx + 1);
+      this.recalculateItemAmount(inv);
+    }
+  }
+
+  recalculateItemAmount(inv: ExtractedInvoice) {
+    if (inv.items) {
+      inv.items.forEach(item => {
+        item.amount = Math.round((item.quantity * item.unitPrice) * 100) / 100;
+      });
     }
   }
 
@@ -82,6 +121,7 @@ export class AppComponent {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           format: this.exportFormat,
+          itemized: this.itemizedExport,
           invoices: this.invoices
         })
       });
@@ -90,7 +130,7 @@ export class AppComponent {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `facturas_${this.exportFormat.toLowerCase()}.csv`;
+      a.download = `facturas_${this.exportFormat.toLowerCase()}_${this.itemizedExport ? 'desglosado' : 'resumen'}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
