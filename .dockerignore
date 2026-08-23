@@ -1,0 +1,20 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log
+
+# Build & coverage outputs
+dist/
+build/
+coverage/
+
+# Git & Documentation
+.git
+.gitignore
+README.md
+architecture/
+agents/
+.vscode/
+.idea/
+
+# Local env files
+.env*

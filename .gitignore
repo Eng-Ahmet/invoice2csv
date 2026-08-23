@@ -1,0 +1,19 @@
+# Node.js dependencies & build outputs
+node_modules/
+dist/
+build/
+.npm
+*.log
+
+# Environment & secrets
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

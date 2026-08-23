@@ -1,0 +1,84 @@
+<div class="app-layout">
+  <header class="navbar">
+    <div class="brand">
+      <span class="icon">🧾</span>
+      <div>
+        <h1>Invoice2CSV</h1>
+        <span class="subtitle">Convertidor Inteligente de Facturas PDF a CSV Contable</span>
+      </div>
+    </div>
+    <div class="preset-pill">
+      Adaptado a España / UE (Holded, Anfix, IVA/IRPF)
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="hero">
+      <h2>Extracción Automatizada de <span class="gradient-text">Facturas PDF</span></h2>
+      <p>Arrastra tus facturas en PDF. Extraemos automáticamente CIF/NIF, Fechas, Base Imponible e IVA sin escribir un solo número a mano.</p>
+    </div>
+
+    <!-- Drop Zone -->
+    <div class="drop-card">
+      <input type="file" #fileInput (change)="onFileSelected($event)" multiple accept="application/pdf" hidden>
+      <div class="drop-content" (click)="fileInput.click()">
+        <span class="upload-icon">📄</span>
+        <h3>Selecciona o arrastra tus facturas PDF</h3>
+        <p>Soporta procesamiento en lote (Batch Upload)</p>
+      </div>
+
+      <div *ngIf="selectedFiles.length > 0" class="file-list">
+        <span *ngFor="let f of selectedFiles" class="chip">📎 {{ f.name }}</span>
+        <button class="btn-primary" (click)="processInvoices()" [disabled]="isProcessing">
+          {{ isProcessing ? 'Extrayendo datos...' : '⚡ Procesar ' + selectedFiles.length + ' Facturas' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Interactive Data Verification Table -->
+    <div *ngIf="invoices.length > 0" class="results-card">
+      <div class="results-header">
+        <h3>Tabla de Verificación y Edición ({{ invoices.length }} Facturas)</h3>
+        
+        <div class="export-controls">
+          <label>Formato Contable:</label>
+          <select [(ngModel)]="exportFormat" class="select-input">
+            <option value="HOLDED">Holded CSV</option>
+            <option value="ANFIX">Anfix CSV</option>
+            <option value="STANDARD">Standard Excel CSV</option>
+          </select>
+          <button class="btn-success" (click)="downloadCsv()">📥 Descargar CSV Contable</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th>Nº Factura</th>
+              <th>Fecha</th>
+              <th>Proveedor</th>
+              <th>CIF / NIF</th>
+              <th>Base Imponible (€)</th>
+              <th>% IVA</th>
+              <th>Cuota IVA (€)</th>
+              <th>Total Factura (€)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let inv of invoices">
+              <td><input [(ngModel)]="inv.invoiceNumber" class="table-input"></td>
+              <td><input [(ngModel)]="inv.invoiceDate" class="table-input"></td>
+              <td><input [(ngModel)]="inv.vendorName" class="table-input"></td>
+              <td><input [(ngModel)]="inv.vendorNif" class="table-input"></td>
+              <td><input type="number" [(ngModel)]="inv.subtotal" class="table-input"></td>
+              <td><input type="number" [(ngModel)]="inv.taxRate" class="table-input"></td>
+              <td><input type="number" [(ngModel)]="inv.taxAmount" class="table-input"></td>
+              <td><input type="number" [(ngModel)]="inv.total" class="table-input bold"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
