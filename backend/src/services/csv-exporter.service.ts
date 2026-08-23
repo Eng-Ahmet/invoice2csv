@@ -1,4 +1,4 @@
-import { json2csv } from 'json2csv';
+import { parse as parseCsv } from 'json2csv';
 import { IExtractedInvoice } from '../models/invoice-job.model.js';
 
 export class CsvExporterService {
@@ -17,7 +17,7 @@ export class CsvExporterService {
         'Total IVA': inv.taxAmount,
         'Total': inv.total
       }));
-      return json2csv(holdedMapped);
+      return parseCsv(holdedMapped);
     }
 
     if (format === 'ANFIX') {
@@ -31,10 +31,10 @@ export class CsvExporterService {
         'CUOTA_IVA': inv.taxAmount,
         'TOTAL_FACTURA': inv.total
       }));
-      return json2csv(anfixMapped);
+      return parseCsv(anfixMapped);
     }
 
     // Standard Default CSV Preset
-    return json2csv(invoices);
+    return parseCsv(invoices);
   }
 }
