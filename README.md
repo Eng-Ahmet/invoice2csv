@@ -13,23 +13,29 @@
 * **Target Audience:** Freelancers, Small Business Owners, Accountants, Bookkeepers.
 * **Core Philosophy:** *PDF Invoice Batch Upload → Intelligent Data Extraction → Accounting-Ready CSV Export.*
 
----
+## 2. Local AI, Computer Vision & Contextual Extraction Engine
 
-## 2. Local AI & GPU Computer Vision Support (NVIDIA CUDA + Ollama)
+Invoice2CSV supports a robust dual-engine extraction architecture:
 
-Invoice2CSV supports hybrid extraction mode:
-
-1. **Contextual Engine & Regex Heuristics:** Zero-cost, instant text parsing for structured PDF documents.
-2. **Local Vision & LLM Acceleration (NVIDIA GPU + Ollama):** For complex scanned image-based invoices or non-standard tabular layouts, Invoice2CSV connects directly to local GPU-accelerated vision models running on **Ollama** (`http://localhost:11434`), utilizing **NVIDIA CUDA** for fast, 100% private local OCR and vision extraction without third-party API costs or cloud data privacy risks.
+1. **Contextual Engine & Multi-Column Spatial Heuristics (Node.js + TS):** Fast, native vector PDF text parsing that handles 2-column horizontal side-by-side party blocks (Supplier vs Client KYC), compound header filtering (`isHeaderOrLabelLine`), and dual-party name isolation (`splitSideBySideNames`).
+2. **PyTorch & CUDA Computer Vision Service (FastAPI + OCR):** GPU-accelerated vision microservice (`python-vision-service` running on port 5000/5840) utilizing **PyTorch CUDA**, **PyTesseract**, and **Poppler** for scanned invoices and complex image-based documents with total local privacy.
 
 ```text
-PDF / Scanned Invoice Image
+PDF / Scanned Invoice Document
   ↓
-Local NVIDIA CUDA Acceleration
-  ↓
-Ollama Local Vision LLM (llama3 / llava / qwen2-vl)
-  ↓
-Strict JSON Invoice Extraction (Seller, Buyer, Line Items, Financials)
+┌─────────────────────────────────────────────────────────┐
+│       Dual-Engine Extraction Architecture               │
+│  ┌─────────────────────────┐ ┌───────────────────────┐  │
+│  │ Contextual Spatial      │ │ PyTorch CUDA & Vision │  │
+│  │ Multi-Column Engine     │ │ OCR Microservice      │  │
+│  └────────────┬────────────┘ └───────────┬───────────┘  │
+└───────────────┼──────────────────────────┼──────────────┘
+                │                          │
+                ▼                          ▼
+       Compound Header Blacklisting & 2-Column Split
+                │
+                ▼
+   Strict JSON Invoice Metadata (Seller, Buyer, Items, Taxes)
 ```
 
 ---
@@ -45,7 +51,9 @@ PAINFUL WORKFLOW:
 OPTIMIZED WORKFLOW:
 Upload PDF Invoice Batch
   ↓
-Invoice2CSV Extraction Engine (NVIDIA GPU Local Vision / Node.js TS)
+Invoice2CSV Dual-Engine Extraction (Node.js TS Spatial Parser & PyTorch CUDA Vision)
+  ↓
+2-Column Horizontal Party Block Isolation (Supplier vs Client KYC)
   ↓
 Export Standardized Accounting CSV (Holded / Anfix / Standard Excel)
 ```
@@ -56,8 +64,10 @@ Export Standardized Accounting CSV (Holded / Anfix / Standard Excel)
 
 * **Saves 90% Manual Entry Time:** Converts 50 PDF invoices into a clean accounting CSV in under 30 seconds.
 * **Pre-Configured Regional Tax Presets:** Includes specific tax rule templates for Spanish/EU invoice requirements (IVA 21%, 10%, 4%, IRPF withholdings).
+* **Side-by-Side Party Separation:** Advanced 2-column spatial parsing separates Seller (Emisor) and Buyer (Comprador) even when printed horizontally on the same line.
+* **Compound Label Blacklisting:** Filters out document titles (`Official invoice document`) and combined labels (`BILL TO / CLIENT IDENTITY KYC`) to ensure zero false positives.
 * **Batch Document Processing:** Drag-and-drop hundreds of PDF files in one session.
-* **100% Offline & Private GPU Processing:** Runs on local NVIDIA hardware via Ollama for total data privacy.
+* **100% Offline & Private GPU Processing:** Local PyTorch CUDA vision service ensures total data privacy.
 
 ---
 
@@ -75,10 +85,10 @@ Export Standardized Accounting CSV (Holded / Anfix / Standard Excel)
 
 ```mermaid
 flowchart LR
-    A[Batch Drag & Drop PDF Invoices] --> B[Node.js + TS PDF Extraction Engine]
-    B --> C{Local Ollama Vision Available?}
-    C -->|YES| D[NVIDIA GPU Accelerated LLM Parse]
-    C -->|NO| E[Contextual Regex & Structure Parser]
+    A[Batch Drag & Drop PDF Invoices] --> B[Node.js + TS Spatial Extraction Engine]
+    B --> C{2-Column Party Layout Detected?}
+    C -->|YES| D[Side-by-Side Column & Dual-Name Separator]
+    C -->|NO / Scanned| E[PyTorch CUDA Vision Microservice]
     D & E --> F[Extract Seller, Buyer, Line Items & Taxes]
     F --> G[Angular Interactive Data Verification Table]
     G --> H[Export Accounting CSV / Excel Template]
