@@ -2,32 +2,50 @@ services:
   mongodb:
     image: mongo:7
     container_name: invoice2csv-db
-    ports:
-      - "27018:27017"
     volumes:
       - mongo_data:/data/db
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.2'
+          memory: 128M
+    networks:
+      - default
 
   python-vision:
     build:
       context: ./python-vision-service
       dockerfile: Dockerfile
     container_name: invoice2csv-python-vision
-    ports:
-      - "5840:5000"
     environment:
       - PORT=5000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+    networks:
+      - default
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: invoice2csv-backend
-    ports:
-      - "3840:3000"
     environment:
       - PORT=3000
       - MONGO_URI=mongodb://mongodb:27017/invoice2csv
@@ -36,17 +54,46 @@ services:
       - mongodb
       - python-vision
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    networks:
+      - default
+      - caddy_proxy
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: invoice2csv-frontend
-    ports:
-      - "4840:80"
     depends_on:
       - backend
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    networks:
+      - caddy_proxy
+
+networks:
+  caddy_proxy:
+    external: true
 
 volumes:
   mongo_data:
+
+
