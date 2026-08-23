@@ -1,10 +1,27 @@
 import { Schema, model, Document } from 'mongoose';
 
+export interface IInvoiceItem {
+  itemNumber: number;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
 export interface IExtractedInvoice {
   invoiceNumber: string;
   invoiceDate: string;
-  vendorName: string;
-  vendorNif: string;
+  // Seller / Supplier Info
+  sellerName: string;
+  sellerNif: string;
+  sellerAddress: string;
+  // Buyer / Client Info
+  buyerName: string;
+  buyerNif: string;
+  buyerAddress: string;
+  // Line Items
+  items: IInvoiceItem[];
+  // Financial Summary
   subtotal: number;
   taxRate: number;
   taxAmount: number;
@@ -26,14 +43,27 @@ const InvoiceJobSchema = new Schema<IInvoiceJob>({
   extractedData: {
     invoiceNumber: { type: String, default: '' },
     invoiceDate: { type: String, default: '' },
-    vendorName: { type: String, default: 'Desconocido' },
-    vendorNif: { type: String, default: '' },
+    sellerName: { type: String, default: '' },
+    sellerNif: { type: String, default: '' },
+    sellerAddress: { type: String, default: '' },
+    buyerName: { type: String, default: '' },
+    buyerNif: { type: String, default: '' },
+    buyerAddress: { type: String, default: '' },
+    items: [
+      {
+        itemNumber: Number,
+        description: String,
+        quantity: Number,
+        unitPrice: Number,
+        amount: Number
+      }
+    ],
     subtotal: { type: Number, default: 0 },
-    taxRate: { type: Number, default: 21 },
+    taxRate: { type: Number, default: 0 },
     taxAmount: { type: Number, default: 0 },
     irpfAmount: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
-    currency: { type: String, default: 'EUR' }
+    currency: { type: String, default: '' }
   },
   createdAt: { type: Date, default: Date.now }
 });

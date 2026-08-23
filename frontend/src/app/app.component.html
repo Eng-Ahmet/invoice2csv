@@ -4,18 +4,18 @@
       <span class="icon">🧾</span>
       <div>
         <h1>Invoice2CSV</h1>
-        <span class="subtitle">Convertidor Inteligente de Facturas PDF a CSV Contable</span>
+        <span class="subtitle">Extractor de Facturas Comerciales y Servicios a CSV Contable</span>
       </div>
     </div>
     <div class="preset-pill">
-      Adaptado a España / UE (Holded, Anfix, IVA/IRPF)
+      100% Extracción Real (Sin valores predeterminados)
     </div>
   </header>
 
   <main class="content">
     <div class="hero">
-      <h2>Extracción Automatizada de <span class="gradient-text">Facturas PDF</span></h2>
-      <p>Arrastra tus facturas en PDF. Extraemos automáticamente CIF/NIF, Fechas, Base Imponible e IVA sin escribir un solo número a mano.</p>
+      <h2>Extracción Inteligente de <span class="gradient-text">Vendedor, Comprador y Líneas</span></h2>
+      <p>Procesa facturas comerciales o de servicios en cualquier idioma o formato. Identifica al Vendedor, Comprador, Fechas, Conceptos y Desglose Tributario.</p>
     </div>
 
     <!-- Drop Zone -->
@@ -24,13 +24,13 @@
       <div class="drop-content" (click)="fileInput.click()">
         <span class="upload-icon">📄</span>
         <h3>Selecciona o arrastra tus facturas PDF</h3>
-        <p>Soporta procesamiento en lote (Batch Upload)</p>
+        <p>Soporta facturas comerciales, de servicios y procesamiento en lote (Batch Upload)</p>
       </div>
 
       <div *ngIf="selectedFiles.length > 0" class="file-list">
         <span *ngFor="let f of selectedFiles" class="chip">📎 {{ f.name }}</span>
         <button class="btn-primary" (click)="processInvoices()" [disabled]="isProcessing">
-          {{ isProcessing ? 'Extrayendo datos...' : '⚡ Procesar ' + selectedFiles.length + ' Facturas' }}
+          {{ isProcessing ? 'Extrayendo datos de PDF...' : '⚡ Procesar ' + selectedFiles.length + ' Facturas' }}
         </button>
       </div>
     </div>
@@ -38,14 +38,14 @@
     <!-- Interactive Data Verification Table -->
     <div *ngIf="invoices.length > 0" class="results-card">
       <div class="results-header">
-        <h3>Tabla de Verificación y Edición ({{ invoices.length }} Facturas)</h3>
+        <h3>Verificación de Facturas Extrayendo ({{ invoices.length }})</h3>
         
         <div class="export-controls">
           <label>Formato Contable:</label>
           <select [(ngModel)]="exportFormat" class="select-input">
             <option value="HOLDED">Holded CSV</option>
             <option value="ANFIX">Anfix CSV</option>
-            <option value="STANDARD">Standard Excel CSV</option>
+            <option value="STANDARD">Standard CSV</option>
           </select>
           <button class="btn-success" (click)="downloadCsv()">📥 Descargar CSV Contable</button>
         </div>
@@ -57,20 +57,33 @@
             <tr>
               <th>Nº Factura</th>
               <th>Fecha</th>
-              <th>Proveedor</th>
-              <th>CIF / NIF</th>
-              <th>Base Imponible (€)</th>
+              <th>Vendedor (Proveedor)</th>
+              <th>NIF Vendedor</th>
+              <th>Comprador (Cliente)</th>
+              <th>NIF Comprador</th>
+              <th>Conceptos / Líneas</th>
+              <th>Subtotal</th>
               <th>% IVA</th>
-              <th>Cuota IVA (€)</th>
-              <th>Total Factura (€)</th>
+              <th>Total IVA</th>
+              <th>Total Factura</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let inv of invoices">
               <td><input [(ngModel)]="inv.invoiceNumber" class="table-input"></td>
               <td><input [(ngModel)]="inv.invoiceDate" class="table-input"></td>
-              <td><input [(ngModel)]="inv.vendorName" class="table-input"></td>
-              <td><input [(ngModel)]="inv.vendorNif" class="table-input"></td>
+              <td><input [(ngModel)]="inv.sellerName" class="table-input highlight"></td>
+              <td><input [(ngModel)]="inv.sellerNif" class="table-input"></td>
+              <td><input [(ngModel)]="inv.buyerName" class="table-input highlight-buyer"></td>
+              <td><input [(ngModel)]="inv.buyerNif" class="table-input"></td>
+              <td>
+                <span *ngIf="inv.items && inv.items.length > 0" class="items-badge">
+                  {{ inv.items.length }} concepto(s)
+                </span>
+                <span *ngIf="!inv.items || inv.items.length === 0" class="no-items">
+                  Sin detalle
+                </span>
+              </td>
               <td><input type="number" [(ngModel)]="inv.subtotal" class="table-input"></td>
               <td><input type="number" [(ngModel)]="inv.taxRate" class="table-input"></td>
               <td><input type="number" [(ngModel)]="inv.taxAmount" class="table-input"></td>

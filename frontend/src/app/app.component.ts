@@ -2,11 +2,24 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
+export interface InvoiceItem {
+  itemNumber: number;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
 export interface ExtractedInvoice {
   invoiceNumber: string;
   invoiceDate: string;
-  vendorName: string;
-  vendorNif: string;
+  sellerName: string;
+  sellerNif: string;
+  sellerAddress: string;
+  buyerName: string;
+  buyerNif: string;
+  buyerAddress: string;
+  items: InvoiceItem[];
   subtotal: number;
   taxRate: number;
   taxAmount: number;
@@ -54,7 +67,7 @@ export class AppComponent {
         this.invoices = data.invoices;
       }
     } catch (err) {
-      alert('Error de conexión con el backend de Invoice2CSV');
+      alert('Error de conexión con el backend de Invoice2CSV (Puerto 3840)');
     } finally {
       this.isProcessing = false;
     }
