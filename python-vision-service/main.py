@@ -401,16 +401,27 @@ class PyTorchInvoiceExtractor:
             "currency": currency
         }
 
+    def format_item_description(self, raw_desc: str) -> str:
+        if not raw_desc:
+            return ""
+        s = raw_desc.strip()
+        s = re.sub(r'^(\d+)([A-Za-z])', r'\1 \2', s)
+        s = re.sub(r'([A-Z])([a-z])', r'\1 \2', s)
+        s = re.sub(r'([a-z])([A-Z])', r'\1 \2', s)
+        s = re.sub(r'([A-Za-z])(\d)', r'\1 \2', s)
+        s = re.sub(r'([%0-9])([A-Za-z])', r'\1 \2', s)
+        return re.sub(r'\s{2,}', ' ', s).strip()
+
     def extract_items(self) -> List[InvoiceItem]:
         items = []
-        line_regex = re.compile(r'^\s*(\d+)\s+([A-Za-z0-9_\-\s]{2,40})\s+([A-Za-z0-9_\-\s]{2,40})?\s*.*?[€$£]?\s*([0-9.,]+)$', re.MULTILINE)
+        line_regex = re.compile(r'(?:^|\n)\s*(\d+)\s*([A-Za-z0-9_\-\s%]{2,60}?)\s*[€$£]?\s*([0-9]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2}))', re.MULTILINE)
         matches = line_regex.findall(self.text)
         
         idx = 1
         for match in matches:
-            amt = self.parse_money(match[3])
+            amt = self.parse_money(match[2])
             if amt > 0:
-                desc = f"{match[1].strip()}" + (f" - {match[2].strip()}" if match[2] else "")
+                desc = self.format_item_description(match[1])
                 items.append(InvoiceItem(
                     itemNumber=idx,
                     description=desc,

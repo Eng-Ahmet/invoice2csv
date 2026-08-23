@@ -300,6 +300,28 @@ export class PdfParserService {
     return { buyerName: parsed.name, buyerNif: parsed.nif, buyerAddress: parsed.address };
   }
 
+  private formatItemDescription(rawDesc: string): string {
+    if (!rawDesc) return '';
+    let str = rawDesc.trim();
+
+    // 1. Separate leading item digits: '1MOODIF' -> '1 MOODIF'
+    str = str.replace(/^(\d+)([A-Za-z])/, '$1 $2');
+
+    // 2. Separate UPPERCASE block followed by lowercase word: 'MOODIFsecunda' -> 'MOODIF secunda'
+    str = str.replace(/([A-Z])([a-z])/g, '$1 $2');
+
+    // 3. Separate lowercase word followed by UPPERCASE word: 'pagoMILESTONE' -> 'pago MILESTONE'
+    str = str.replace(/([a-z])([A-Z])/g, '$1 $2');
+
+    // 4. Separate letter followed by digit: 'pago0' -> 'pago 0'
+    str = str.replace(/([A-Za-z])(\d)/g, '$1 $2');
+
+    // 5. Separate digit/percentage followed by letter: '0%Milestone' -> '0% Milestone'
+    str = str.replace(/([%0-9])([A-Za-z])/g, '$1 $2');
+
+    return str.replace(/\s{2,}/g, ' ').trim();
+  }
+
   private extractLineItems(text: string): IInvoiceItem[] {
     const items: IInvoiceItem[] = [];
     
@@ -313,7 +335,7 @@ export class PdfParserService {
       if (amt > 0) {
         items.push({
           itemNumber: index++,
-          description: match[2].trim(),
+          description: this.formatItemDescription(match[2]),
           quantity: 1,
           unitPrice: amt,
           amount: amt
