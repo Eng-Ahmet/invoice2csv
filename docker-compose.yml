@@ -75,8 +75,6 @@ services:
     container_name: invoice2csv-frontend
     depends_on:
       - backend
-    ports:
-      - "8080:80"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

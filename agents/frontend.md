@@ -11,7 +11,7 @@ Develop an intuitive Angular web interface for PDF batch uploading and interacti
 * Create editable grid verification table for reviewing extracted invoice line items before export.
 * Implement preset selectors for regional accounting formats.
 * **Iconography Standard**: All UI components and buttons MUST strictly use **Font Awesome 6** (`fa-solid`) icons.
-* **Container Port Exposure**: Frontend Docker container MUST always expose host port mapping (`8080:80`) in `docker-compose.yml`.
+* **Network & Proxy Routing**: Do NOT bind direct host ports (like `8080:80`) in `docker-compose.yml` to prevent address conflicts with Caddy proxy and other micro-products; connect via `caddy_proxy` network instead.
 
 ## Technology Context
 * Angular 17+, TypeScript, RxJS, HTML5, CSS3.
